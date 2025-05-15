@@ -34,7 +34,7 @@ WORKDIR /usr/src/app
 
 # Copy the built binary from the previous stage
 COPY --from=builder /usr/src/app/target/release/tiltify-twitchbot ./
-COPY ./.env ./.env
+COPY ./.env.example ./.env
 COPY ./channels.json ./channels.json
 COPY ./bot.json ./bot.json
 COPY ./config.toml ./config.toml
