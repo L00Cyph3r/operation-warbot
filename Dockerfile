@@ -36,7 +36,6 @@ WORKDIR /usr/src/app
 COPY --from=builder /usr/src/app/target/release/tiltify-twitchbot ./
 COPY ./.env.example ./.env
 COPY ./channels.json ./channels.json
-COPY ./bot.json ./bot.json
 COPY ./config.toml ./config.toml
 
 EXPOSE 28257
