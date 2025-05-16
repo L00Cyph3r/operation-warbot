@@ -13,9 +13,9 @@ use twitch_api::eventsub::{Event, Message, Payload};
 use twitch_api::extra::AnnouncementColor;
 use twitch_api::helix::chat::{
     SendChatAnnouncementBody, SendChatAnnouncementRequest,
-    SendChatMessageBody, SendChatMessageRequest, SendChatMessageResponse,
+    SendChatMessageBody, SendChatMessageRequest,
 };
-use twitch_api::helix::{ClientRequestError, Request, RequestPost, Response};
+use twitch_api::helix::{ClientRequestError, Request, Response};
 use twitch_api::{HelixClient, eventsub};
 use twitch_oauth2::{TwitchToken, UserToken};
 
@@ -218,8 +218,8 @@ impl Bot {
         let token = &self.token.lock().await.clone();
         let req = SendChatAnnouncementRequest::new(&channel.user_id, &token.user_id);
         let body = SendChatAnnouncementBody::new(message, AnnouncementColor::Orange)?;
-        let res = self.client.req_post(req, body.clone(), token).in_current_span();
-        self.handle_client_post(res.await).expect("couldn't send announcement");
+        let res = self.client.req_post(req, body.clone(), token).in_current_span().await;
+        self.handle_client_post(res).expect("couldn't send announcement");
         info!("Announcement sent to channel: {}", channel.name);
         Ok(())
     }
@@ -230,8 +230,8 @@ impl Bot {
         let token = &self.token.lock().await.clone();
         let req = SendChatMessageRequest::new();
         let body = SendChatMessageBody::new(&channel.user_id, &token.user_id, message);
-        let res = self.client.req_post(req, body.clone(), token).in_current_span();
-        self.handle_client_post(res.await).expect("couldn't send message");
+        let res = self.client.req_post(req, body.clone(), token).in_current_span().await;
+        self.handle_client_post(res).expect("couldn't send message");
         info!("Message sent to channel: {}", channel.name);
         Ok(())
     }
@@ -287,15 +287,15 @@ impl Bot {
     #[tracing::instrument(skip(self))]
     async fn command(
         &self,
-        payload: &eventsub::channel::ChannelChatMessageV1Payload,
-        subscription: &eventsub::EventSubscriptionInformation<
+        _payload: &eventsub::channel::ChannelChatMessageV1Payload,
+        _subscription: &eventsub::EventSubscriptionInformation<
             eventsub::channel::ChannelChatMessageV1,
         >,
         command: &str,
         _rest: Option<&str>,
-        token: &UserToken,
+        _token: &UserToken,
     ) -> Result<(), Report> {
-        tracing::info!("Command: {}", command);
+        info!("Command: {}", command);
         // if let Some(response) = self.config.command.iter().find(|c| c.trigger == command) {
         //     self.client
         //         .send_chat_message_reply(

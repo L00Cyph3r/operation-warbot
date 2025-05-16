@@ -75,13 +75,13 @@ async fn main() {
             let app = Router::new().merge(routes::router()).with_state(app_state);
 
             axum::serve(listener, app)
-                .with_graceful_shutdown(async move {
-                    tokio::signal::ctrl_c()
-                        .await
-                        .expect("failed to install CTRL+C handler");
-                    let _ = tx.send(Commands::Shutdown);
-                    tracing::info!("received CTRL+C, shutting down");
-                })
+                // .with_graceful_shutdown(async move {
+                //     tokio::signal::ctrl_c()
+                //         .await
+                //         .expect("failed to install CTRL+C handler");
+                //     let _ = tx.send(Commands::Shutdown);
+                //     tracing::info!("received CTRL+C, shutting down");
+                // })
                 .await
                 .unwrap();
         }
