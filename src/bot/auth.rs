@@ -4,7 +4,7 @@ use std::env;
 use std::fmt::Debug;
 use std::io::{Read, Write};
 use std::path::Path;
-use tracing::error;
+use tracing::{error, Instrument};
 use twitch_api::client::CompatError;
 use twitch_api::helix::streams::StreamType;
 use twitch_api::types::{UserId, UserName};
@@ -42,6 +42,7 @@ impl Channels {
         }
     }
 
+    #[tracing::instrument(skip(self, client))]
     pub async fn get_live_channels(
         &self,
         client: &HelixClient<'_, reqwest::Client>,
@@ -49,7 +50,7 @@ impl Channels {
     ) -> Vec<Channel> {
         let all: Vec<UserId> = self.0.iter().map(|c| c.user_id.clone()).collect();
         let req = twitch_api::helix::streams::get_streams::GetStreamsRequest::user_ids(all);
-        match client.req_get(req, token).await {
+        match client.req_get(req, token).in_current_span().await {
             Ok(res) => res
                 .data
                 .iter()

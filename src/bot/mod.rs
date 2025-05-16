@@ -1,26 +1,23 @@
 use crate::bot::auth::{Channel, Channels, User};
 use crate::config::Config;
-use crate::{Commands, SharedAppState};
+use crate::{Commands};
 use eyre::{Report, WrapErr as _};
 use reqwest::Error;
 use std::sync::Arc;
-use std::thread::spawn;
 use std::time::Duration;
 use tokio::sync::Mutex;
 use tokio::sync::broadcast::error::{RecvError, TryRecvError};
 use tokio::time::sleep;
-use tracing::{Instrument, debug, error, info, span};
-use twitch_api::client::ResponseExt;
+use tracing::{Instrument, error, info, span};
 use twitch_api::eventsub::{Event, Message, Payload};
 use twitch_api::extra::AnnouncementColor;
 use twitch_api::helix::chat::{
-    SendChatAnnouncementBody, SendChatAnnouncementRequest, SendChatAnnouncementResponse,
+    SendChatAnnouncementBody, SendChatAnnouncementRequest,
     SendChatMessageBody, SendChatMessageRequest, SendChatMessageResponse,
 };
-use twitch_api::helix::{ClientRequestError, HelixRequestBody, Request, RequestPost, Response};
-use twitch_api::types::UserId;
-use twitch_api::{HelixClient, eventsub, helix};
-use twitch_oauth2::{TwitchToken, UserToken, ValidatedToken};
+use twitch_api::helix::{ClientRequestError, Request, RequestPost, Response};
+use twitch_api::{HelixClient, eventsub};
+use twitch_oauth2::{TwitchToken, UserToken};
 
 pub mod auth;
 pub mod websocket;
@@ -103,7 +100,7 @@ impl Bot {
                     .await
                     .wrap_err("couldn't validate token")
                 {
-                    Ok(vt) => {
+                    Ok(_) => {
                         info!(
                             "Token {} still valid, expiration is in {} seconds",
                             token_cloned.access_token,
@@ -149,8 +146,10 @@ impl Bot {
                                     .instrument(span!(tracing::Level::INFO, "get_live_channels"))
                                     .await;
                                 info!("Live channels: {:?}", live_channels);
-                                let message =
-                                    format!("!donation_received {}", donation.amount.value);
+                                let message = format!(
+                                    "!donation_received {}",
+                                    donation.amount.value
+                                );
 
                                 let announcement = format!(
                                     "A donation of ${} has been made by {}!",
@@ -215,29 +214,26 @@ impl Bot {
 
     #[tracing::instrument(skip(self))]
     async fn send_chat_announcement(&self, channel: &Channel, message: &str) -> Result<(), Report> {
-        if channel.user_id.to_string() != "32084194" {
-            return Ok(());
-        }
-
+        info!("Sending announcement sent to channel: {}", channel.name);
         let token = &self.token.lock().await.clone();
         let req = SendChatAnnouncementRequest::new(&channel.user_id, &token.user_id);
         let body = SendChatAnnouncementBody::new(message, AnnouncementColor::Orange)?;
-        let res = self.client.req_post(req, body.clone(), token);
-        self.handle_client_post(res.await)?;
+        let res = self.client.req_post(req, body.clone(), token).in_current_span();
+        self.handle_client_post(res.await).expect("couldn't send announcement");
+        info!("Announcement sent to channel: {}", channel.name);
         Ok(())
     }
 
     #[tracing::instrument(skip(self))]
     async fn send_chat_message(&self, channel: &Channel, message: &str) -> Result<(), Report> {
-        if channel.user_id.to_string() != "32084194" {
-            return Ok(());
-        }
-
+        info!("Sending message sent to channel: {}", channel.name);
         let token = &self.token.lock().await.clone();
         let req = SendChatMessageRequest::new();
         let body = SendChatMessageBody::new(&channel.user_id, &token.user_id, message);
-        let res = self.client.req_post(req, body.clone(), token);
-        self.handle_client_post(res.await)
+        let res = self.client.req_post(req, body.clone(), token).in_current_span();
+        self.handle_client_post(res.await).expect("couldn't send message");
+        info!("Message sent to channel: {}", channel.name);
+        Ok(())
     }
 
     #[tracing::instrument(skip(self))]
