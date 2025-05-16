@@ -113,7 +113,7 @@ impl Bot {
                             let moderated_live_channels = self
                                 .channels
                                 .clone()
-                                .get_moderated_channels(&self.client.clone(), &token.clone())
+                                .get_moderated_live_channels(&self.client.clone(), &token.clone())
                                 .await;
                             info!("Live channels: {:?}", moderated_live_channels);
                             let message = format!("!donation_received {}", donation.amount.value);
