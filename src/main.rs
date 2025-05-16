@@ -34,7 +34,7 @@ async fn main() {
         .with(
             tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| {
                 format!(
-                    "info,{}=trace,hyper_util=debug,axum_serve=debug,tungstenite=debug",
+                    "debug,{}=trace,hyper_util=debug,axum_serve=debug,tungstenite=debug",
                     env!("CARGO_CRATE_NAME")
                 )
                 .into()
@@ -57,7 +57,7 @@ async fn main() {
 
     let config = Config::load("config.toml").expect("Failed to load config");
 
-    let (tx, rx): (Sender<Commands>, Receiver<Commands>) = broadcast::channel(8);
+    let (tx, rx): (Sender<Commands>, Receiver<Commands>) = broadcast::channel(100);
     let app_state: SharedAppState = Arc::new(Mutex::new(AppState {
         received_donations: HashSet::new(),
         tx: tx.clone(),
@@ -123,16 +123,28 @@ async fn main() {
 
     let channels = Channels::load(&config.storage.channels).unwrap_or_default();
     channels.save(&config.storage.channels).unwrap();
-    let bot = Bot {
+    let mut bot = Bot {
         client: HelixClient::default(),
         token: bot_token.clone(),
         config: config.clone(),
         broadcaster: UserId::new("Test".to_string()),
-        channels,
+        channels: channels.clone(),
         rx,
     };
-
     let bot_handle = bot.start();
+    
+
+    // let mut bot = Bot {
+    //     client: HelixClient::default(),
+    //     token: bot_token.clone(),
+    //     config: config.clone(),
+    //     broadcaster: UserId::new("Test".to_string()),
+    //     channels,
+    //     rx: tx.subscribe(),
+    // };
+    // let bot_handle2 = tokio::spawn(async move {
+    //     bot.listen().await
+    // });
 
     let _ = tokio::join!(http_handle, bot_handle);
 }

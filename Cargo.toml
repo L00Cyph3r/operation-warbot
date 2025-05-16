@@ -6,7 +6,8 @@ edition = "2024"
 [dependencies]
 anyhow = { version = "1.0.98", features = ["backtrace"] }
 thiserror = { version = "2.0.12", features = [] }
-axum = { version = "0.8.4", features = ["http2", "json", "tracing", "tokio"] }
+axum = { version = "0.8.4", features = ["http2", "json", "tracing", "tokio", "matched-path", "default"] }
+axum-extra = { version = "0.10.1", features = ["json-deserializer", "json-lines"] }
 clap = { version = "4.5.37", features = ["derive", "env"] }
 crossbeam = { version = "0.8.4", features = [] }
 eyre = "0.6.12"

@@ -25,7 +25,7 @@ pub struct Data {
     pub reward_id: Option<serde_json::Value>,
     pub sustained: bool,
     pub target_id: Option<serde_json::Value>,
-    pub team_event_id: String,
+    pub team_event_id: Option<serde_json::Value>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
