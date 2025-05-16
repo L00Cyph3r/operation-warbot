@@ -202,6 +202,7 @@ impl User {
                 Scope::UserReadChat,
                 Scope::UserWriteChat,
                 Scope::ModeratorManageAnnouncements,
+                Scope::UserReadModeratedChannels,
             ],
         );
         let code = builder
