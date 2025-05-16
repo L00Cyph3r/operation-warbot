@@ -9,7 +9,7 @@ use twitch_api::client::CompatError;
 use twitch_api::helix::streams::StreamType;
 use twitch_api::types::{UserId, UserName};
 use twitch_api::{HelixClient, TwitchClient};
-use twitch_oauth2::AccessToken;
+use twitch_oauth2::{AccessToken, TwitchToken};
 use twitch_oauth2::AppAccessToken;
 use twitch_oauth2::ClientId;
 use twitch_oauth2::ClientSecret;
@@ -66,6 +66,44 @@ impl Channels {
             }
         }
     }
+
+    #[tracing::instrument(skip(self, client))]
+    pub async fn get_moderated_channels(
+        &self,
+        client: &HelixClient<'_, reqwest::Client>,
+        token: &UserToken,
+    ) -> Vec<Channel> {
+        let req = twitch_api::helix::moderation::get_moderated_channels::GetModeratedChannelsRequest::user_id(&token.user_id);
+        match client.req_get(req, token).in_current_span().await {
+            Ok(res) => res
+                .data
+                .iter()
+                .map(|s| Channel {
+                    name: s.broadcaster_login.clone(),
+                    user_id: s.broadcaster_id.clone(),
+                })
+                .collect::<Vec<Channel>>(),
+            Err(e) => {
+                error!("{e:?}");
+                Vec::new()
+            }
+        }
+    }
+    
+    pub async fn get_moderated_live_channels(
+        &self,
+        client: &HelixClient<'_, reqwest::Client>,
+        token: &UserToken,
+    ) -> Vec<Channel> {
+        let (live, moderated) = tokio::join!(self.get_live_channels(client, token), self.get_moderated_channels(client, token));
+        let mut channels: Vec<Channel> = Vec::new();
+        for channel in moderated {
+            if live.iter().any(|live| live.user_id == channel.user_id) {
+                channels.push(channel);
+            }
+        }
+        channels
+    }
 }
 
 impl Into<Vec<UserId>> for Channels {
@@ -99,7 +137,7 @@ pub struct User {
     pub twitch_name: UserName,
     pub access_token: Option<AccessToken>,
     pub refresh_token: Option<RefreshToken>,
-    pub expires_in: Option<i64>,
+    pub expires_in: Option<u64>,
     #[serde(skip)]
     pub user_token: Option<UserToken>,
 }
@@ -240,9 +278,9 @@ impl From<UserToken> for User {
         Self {
             user_id: token.user_id.clone(),
             twitch_name: token.login.clone(),
-            access_token: None,
-            refresh_token: None,
-            expires_in: None,
+            access_token: Some(token.access_token.clone()),
+            refresh_token: token.refresh_token.clone(),
+            expires_in: Some(token.expires_in().as_secs()),
             user_token: Some(token),
         }
     }

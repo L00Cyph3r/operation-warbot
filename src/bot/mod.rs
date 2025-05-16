@@ -3,18 +3,17 @@ use crate::bot::auth::{Channel, Channels, User};
 use crate::config::Config;
 use eyre::{Report, WrapErr as _};
 use reqwest::Error;
-use std::ops::DerefMut;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::Mutex;
-use tokio::sync::broadcast::error::{RecvError, TryRecvError};
+use tokio::sync::broadcast::error::{TryRecvError};
 use tokio::time::sleep;
 use tracing::{Instrument, error, info, span, warn};
 use twitch_api::eventsub::{Event, Message, Payload};
 use twitch_api::extra::AnnouncementColor;
 use twitch_api::helix::chat::{
     SendChatAnnouncementBody, SendChatAnnouncementRequest, SendChatMessageBody,
-    SendChatMessageRequest, SendChatMessageResponse,
+    SendChatMessageRequest,
 };
 use twitch_api::helix::{ClientRequestError, Request, Response};
 use twitch_api::{HelixClient, eventsub};
@@ -43,47 +42,23 @@ impl Bot {
     pub async fn start(&mut self) -> Result<(), Report> {
         // To make a connection to the chat we need to use a websocket connection.
         // This is a wrapper for the websocket connection that handles the reconnects and handles all messages from eventsub.
-        let websocket = websocket::ChatWebsocketClient {
-            session_id: None,
-            token: self.token.clone(),
-            client: self.client.clone(),
-            connect_url: twitch_api::TWITCH_EVENTSUB_WEBSOCKET_URL.clone(),
-            chats: vec![self.broadcaster.clone()],
-        };
 
-        let mut token_cloned = {
-            let token_locked = self.token.lock().await;
-            token_locked.clone()
-        };
         let refresh_token = async {
             // We check constantly if the token is valid.
             // We also need to refresh the token if it's about to be expired.
-            let mut interval = tokio::time::interval(Duration::from_secs(30));
+            let mut interval = tokio::time::interval(Duration::from_secs(60));
             let span = span!(tracing::Level::INFO, "refresh_token");
-
             loop {
+                let mut token_cloned = {
+                    let token_locked = self.token.lock().await;
+                    token_locked.clone()
+                };
                 let _enter = span.enter();
-
-                // let mut rx = self.rx.resubscribe();
-                // match rx.try_recv() {
-                //     Ok(cmd) => match cmd {
-                //         Commands::Shutdown => return Ok(()),
-                //         _ => {}
-                //     },
-                //     Err(e) => match e {
-                //         TryRecvError::Empty => {}
-                //         TryRecvError::Closed => {
-                //             error!("Broadcast channel closed");
-                //             return Ok(())
-                //         },
-                //         TryRecvError::Lagged(_) => {}
-                //     },
-                // }
 
                 interval.tick().await;
                 info!("Interval ticked, checking token");
                 // let mut token = token.lock().await;
-                if token_cloned.expires_in() < Duration::from_secs(60) {
+                if token_cloned.expires_in() < Duration::from_secs(3600) {
                     info!(
                         "Token expires in {} seconds, refreshing",
                         token_cloned.expires_in().as_secs()
@@ -109,17 +84,15 @@ impl Bot {
                             token_cloned.access_token,
                             token_cloned.expires_in().as_secs(),
                         );
+                        *self.token.lock().await = token_cloned.clone();
+
+                        let bot = User::from(token_cloned.clone());
+                        bot.save(&self.config.storage.bot)
+                            .expect("couldn't save bot");
                     }
                     Err(_) => {}
                 };
-
-                *self.token.lock().await = token_cloned.clone();
-                // *token_shared = token_cloned;
-                // let bot = User::from(token_cloned.clone());
-                // bot.save(&self.config.storage.bot)
-                //     .expect("couldn't save bot");
             }
-            ()
         };
 
         let mut rx = self.rx.resubscribe();
@@ -127,22 +100,22 @@ impl Bot {
             // We check constantly if the token is valid.
             // We also need to refresh the token if it's about to be expired.
             let span = span!(tracing::Level::INFO, "broadcast_handler");
-            let token = self.token.lock().await;
 
             loop {
                 let _span = span.enter();
+                let token = self.token.lock().await;
                 match rx.try_recv() {
                     Ok(cmd) => match cmd {
                         Commands::Shutdown => break,
                         Commands::DonationReceived(donation) => {
                             info!("Donation received: {:#?}", donation);
 
-                            let live_channels = self
+                            let moderated_live_channels = self
                                 .channels
                                 .clone()
-                                .get_live_channels(&self.client.clone(), &token.clone())
+                                .get_moderated_channels(&self.client.clone(), &token.clone())
                                 .await;
-                            info!("Live channels: {:?}", live_channels);
+                            info!("Live channels: {:?}", moderated_live_channels);
                             let message = format!("!donation_received {}", donation.amount.value);
 
                             let announcement = format!(
@@ -150,7 +123,7 @@ impl Bot {
                                 donation.amount.value, donation.name.unwrap_or_else(|| "an anonymous user".to_string())
                             );
                             let mut channels_sent_messages_to: Vec<Channel> = Vec::new();
-                            for live_channel in &live_channels {
+                            for live_channel in &moderated_live_channels {
                                 match Self::send_chat_message(
                                     self.client.clone(),
                                     &token.clone(),
@@ -189,8 +162,8 @@ impl Bot {
                             }
                             info!(
                                 "Donation message sent to {} channels. Channels were: {:?}",
-                                &live_channels.len(),
-                                &live_channels
+                                &moderated_live_channels.len(),
+                                &moderated_live_channels
                             );
                         }
                         Commands::RaidInitiated(_) => {}

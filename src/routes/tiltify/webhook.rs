@@ -4,7 +4,7 @@ use crate::{Commands, SharedAppState};
 use axum::Json;
 use axum::extract::State;
 use axum::extract::rejection::JsonRejection;
-use axum::http::{HeaderMap, Method, StatusCode};
+use axum::http::{Method, StatusCode};
 use axum::response::{IntoResponse, Response};
 use axum_extra::extract::WithRejection;
 use serde_json::json;
