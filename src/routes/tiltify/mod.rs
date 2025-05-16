@@ -33,8 +33,8 @@ impl From<String> for TiltifyEventType {
 pub struct TiltifyDonation {
     pub event_type: TiltifyEventType,
     pub amount: Amount,
-    pub name: String,
-    pub message: String,
+    pub name: Option<String>,
+    pub message: Option<String>,
 }
 
 impl From<TiltifyWebhookRequest> for TiltifyDonation {

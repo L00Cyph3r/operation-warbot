@@ -147,7 +147,7 @@ impl Bot {
 
                             let announcement = format!(
                                 "A donation of ${} has been made by {}!",
-                                donation.amount.value, donation.name
+                                donation.amount.value, donation.name.unwrap_or_else(|| "an anonymous user".to_string())
                             );
                             let mut channels_sent_messages_to: Vec<Channel> = Vec::new();
                             for live_channel in &live_channels {

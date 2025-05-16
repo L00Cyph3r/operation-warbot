@@ -9,13 +9,13 @@ pub struct TiltifyWebhookRequest {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Data {
     pub amount: Amount,
-    pub campaign_id: String,
+    pub campaign_id: Option<String>,
     pub cause_id: String,
     pub completed_at: String,
     pub created_at: String,
-    pub donation_matches: Vec<Option<serde_json::Value>>,
-    pub donor_comment: String,
-    pub donor_name: String,
+    pub donation_matches: Option<Vec<serde_json::Value>>,
+    pub donor_comment: Option<String>,
+    pub donor_name: Option<String>,
     pub fundraising_event_id: Option<serde_json::Value>,
     pub id: String,
     pub legacy_id: i64,
