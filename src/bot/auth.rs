@@ -73,7 +73,7 @@ impl Channels {
         client: &HelixClient<'_, reqwest::Client>,
         token: &UserToken,
     ) -> Vec<Channel> {
-        let req = twitch_api::helix::moderation::get_moderated_channels::GetModeratedChannelsRequest::user_id(&token.user_id);
+        let req = twitch_api::helix::moderation::get_moderated_channels::GetModeratedChannelsRequest::user_id(&token.user_id).first(100);
         match client.req_get(req, token).in_current_span().await {
             Ok(res) => res
                 .data
@@ -101,7 +101,7 @@ impl Channels {
         info!("Moderated: {}", moderated.iter().map(|c| c.name.clone().to_string()).collect::<Vec<String>>().join(" "));
         let mut channels: Vec<Channel> = Vec::new();
         for channel in moderated {
-            if live.iter().any(|live| live.user_id.to_string() == channel.user_id.to_string()) {
+            if live.iter().any(|live| live.user_id == channel.user_id) {
                 channels.push(channel);
             }
         }
