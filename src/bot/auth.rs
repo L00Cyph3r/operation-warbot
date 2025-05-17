@@ -101,7 +101,7 @@ impl Channels {
         info!("Moderated: {}", moderated.iter().map(|c| c.name.clone().to_string()).collect::<Vec<String>>().join(" "));
         let mut channels: Vec<Channel> = Vec::new();
         for channel in moderated {
-            if live.iter().any(|live| live.user_id == channel.user_id) {
+            if live.iter().any(|live| live.user_id.to_string() == channel.user_id.to_string()) {
                 channels.push(channel);
             }
         }
