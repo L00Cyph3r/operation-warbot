@@ -4,7 +4,7 @@ use std::env;
 use std::fmt::Debug;
 use std::io::{Read, Write};
 use std::path::Path;
-use tracing::{error, Instrument};
+use tracing::{error, info, Instrument};
 use twitch_api::client::CompatError;
 use twitch_api::helix::streams::StreamType;
 use twitch_api::types::{UserId, UserName};
@@ -96,6 +96,9 @@ impl Channels {
         token: &UserToken,
     ) -> Vec<Channel> {
         let (live, moderated) = tokio::join!(self.get_live_channels(client, token), self.get_moderated_channels(client, token));
+        info!("Found {} live and {} moderated channels", live.len(), moderated.len());
+        info!("Live: {}", live.iter().map(|c| c.name.clone().to_string()).collect::<Vec<String>>().join(" "));
+        info!("Moderated: {}", moderated.iter().map(|c| c.name.clone().to_string()).collect::<Vec<String>>().join(" "));
         let mut channels: Vec<Channel> = Vec::new();
         for channel in moderated {
             if live.iter().any(|live| live.user_id == channel.user_id) {
