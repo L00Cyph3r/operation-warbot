@@ -6,7 +6,7 @@ use reqwest::Error;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::Mutex;
-use tokio::sync::broadcast::error::{TryRecvError};
+use tokio::sync::broadcast::error::TryRecvError;
 use tokio::time::sleep;
 use tracing::{Instrument, error, info, span, warn};
 use twitch_api::eventsub::{Event, Message, Payload};
@@ -32,7 +32,6 @@ pub struct Bot {
     pub client: HelixClient<'static, reqwest::Client>,
     pub token: Arc<Mutex<UserToken>>,
     pub config: Config,
-    pub broadcaster: twitch_api::types::UserId,
     pub channels: Channels,
     pub rx: tokio::sync::broadcast::Receiver<Commands>,
 }
@@ -40,24 +39,39 @@ pub struct Bot {
 impl Bot {
     //noinspection RsUnreachableCode
     pub async fn start(&mut self) -> Result<(), Report> {
-        // To make a connection to the chat we need to use a websocket connection.
-        // This is a wrapper for the websocket connection that handles the reconnects and handles all messages from eventsub.
+        // To make a connection to the chat, we need to use a websocket connection.
+        // This is a wrapper for the websocket connection that handles the reconnections and handles all messages from eventsub.
 
-        let refresh_token = async {
-            // We check constantly if the token is valid.
-            // We also need to refresh the token if it's about to be expired.
-            let mut interval = tokio::time::interval(Duration::from_secs(60));
-            let span = span!(tracing::Level::INFO, "refresh_token");
-            loop {
-                let mut token_cloned = {
-                    let token_locked = self.token.lock().await;
-                    token_locked.clone()
-                };
-                let _enter = span.enter();
+        match tokio::try_join!(self.refresh_token(), self.broadcast_handler()) {
+            Ok(_) => {}
+            Err(e) => {
+                tracing::error!("{:?}", e);
+            }
+        }
 
-                interval.tick().await;
+        // let ws = websocket.run(|e, ts| async { self.handle_event(e, ts).await });
+        // futures::future::try_join(refresh_token, broadcast_handler).await?;
+        Ok(())
+    }
+
+    async fn refresh_token(&self) -> Result<(), Report> {
+        // We check constantly if the token is valid.
+        // We also need to refresh the token if it's about to be expired.
+        let mut interval = tokio::time::interval(Duration::from_secs(60));
+        let span = span!(tracing::Level::INFO, "refresh_token");
+        loop {
+            let mut token_cloned = {
+                let token_locked = self.token.lock().await;
+                token_locked.clone()
+            };
+            let _enter = span.enter();
+
+            interval.tick().await;
+
+            let check_token_span = span!(tracing::Level::DEBUG, "check_token");
+            {
+                let _span = check_token_span.enter();
                 info!("Interval ticked, checking token");
-                // let mut token = token.lock().await;
                 if token_cloned.expires_in() < Duration::from_secs(3600) {
                     info!(
                         "Token expires in {} seconds, refreshing",
@@ -73,125 +87,123 @@ impl Bot {
                         token_cloned.expires_in().as_secs()
                     );
                 }
-                match token_cloned
-                    .validate_token(&self.client.clone())
-                    .await
-                    .wrap_err("couldn't validate token")
-                {
-                    Ok(_) => {
-                        info!(
-                            "Token {} still valid, expiration is in {} seconds",
-                            token_cloned.access_token,
-                            token_cloned.expires_in().as_secs(),
-                        );
-                        *self.token.lock().await = token_cloned.clone();
-
-                        let bot = User::from(token_cloned.clone());
-                        bot.save(&self.config.storage.bot)
-                            .expect("couldn't save bot");
-                    }
-                    Err(_) => {}
-                };
             }
-        };
 
-        let mut rx = self.rx.resubscribe();
-        let broadcast_handler = async {
-            // We check constantly if the token is valid.
-            // We also need to refresh the token if it's about to be expired.
-            let span = span!(tracing::Level::INFO, "broadcast_handler");
+            match token_cloned
+                .validate_token(&self.client.clone())
+                .await
+                .wrap_err("couldn't validate token")
+            {
+                Ok(_) => {
+                    info!(
+                        "Token {} still valid, expiration is in {} seconds",
+                        token_cloned.access_token,
+                        token_cloned.expires_in().as_secs(),
+                    );
+                    *self.token.lock().await = token_cloned.clone();
 
-            loop {
-                let _span = span.enter();
-                let token = self.token.lock().await;
-                match rx.try_recv() {
-                    Ok(cmd) => match cmd {
-                        Commands::Shutdown => break,
-                        Commands::DonationReceived(donation) => {
-                            info!("Donation received: {:#?}", donation);
-
-                            let moderated_live_channels = self
-                                .channels
-                                .clone()
-                                .get_moderated_live_channels(&self.client.clone(), &token.clone())
-                                .await;
-                            info!("Live channels: {:?}", moderated_live_channels);
-                            let message = format!("!donation_received {}", donation.amount.value);
-
-                            let announcement = format!(
-                                "A donation of ${} has been made by {}!",
-                                donation.amount.value, donation.name.unwrap_or_else(|| "an anonymous user".to_string())
-                            );
-                            let mut channels_sent_messages_to: Vec<Channel> = Vec::new();
-                            for live_channel in &moderated_live_channels {
-                                match Self::send_chat_message(
-                                    self.client.clone(),
-                                    &token.clone(),
-                                    live_channel,
-                                    message.as_str(),
-                                )
-                                .await
-                                {
-                                    Ok(_) => {
-                                        channels_sent_messages_to.push(live_channel.clone());
-                                        info!(
-                                            "Announcement sent to channel: {}",
-                                            live_channel.name
-                                        );
-                                    }
-                                    Err(e) => {
-                                        error!("Error sending message: {e:?}");
-                                    }
-                                };
-                                match Self::send_chat_announcement(
-                                    self.client.clone(),
-                                    &token.clone(),
-                                    live_channel,
-                                    announcement.as_str(),
-                                )
-                                .await
-                                {
-                                    Ok(_) => {
-                                        channels_sent_messages_to.push(live_channel.clone());
-                                        info!("Message sent to channel: {}", live_channel.name);
-                                    }
-                                    Err(e) => {
-                                        error!("Error sending message: {e:?}");
-                                    }
-                                };
-                            }
-                            info!(
-                                "Donation message sent to {} channels. Channels were: {:?}",
-                                &moderated_live_channels.len(),
-                                &moderated_live_channels
-                            );
-                        }
-                        Commands::RaidInitiated(_) => {}
-                        Commands::StreamStarted(_) => {}
-                        Commands::StreamEnded(_) => {}
-                    },
-                    Err(e) => match e {
-                        TryRecvError::Closed => {
-                            warn!("Broadcast channel closed");
-                            break;
-                        }
-                        TryRecvError::Lagged(_) => {
-                            warn!("Broadcast channel lagged");
-                            break;
-                        }
-                        TryRecvError::Empty => {
-                            sleep(Duration::from_millis(100)).await;
-                        }
-                    },
+                    let bot = User::from(token_cloned.clone());
+                    bot.save(&self.config.storage.bot)
+                        .expect("couldn't save bot");
                 }
-            }
-            info!("broadcast_handler loop ended");
-        };
-
-        tokio::join!(refresh_token, broadcast_handler);
-        // let ws = websocket.run(|e, ts| async { self.handle_event(e, ts).await });
-        // futures::future::try_join(refresh_token, broadcast_handler).await?;
+                Err(_) => {}
+            };
+        }
         Ok(())
+    }
+
+    async fn broadcast_handler(&self) -> Result<(), Report> {
+        let mut rx = self.rx.resubscribe();
+        // We check constantly if the token is valid.
+        // We also need to refresh the token if it's about to be expired.
+        let span = span!(tracing::Level::INFO, "broadcast_handler");
+
+        loop {
+            let _span = span.enter();
+            let token = self.token.lock().await;
+            match rx.try_recv() {
+                Ok(cmd) => match cmd {
+                    Commands::Shutdown => break,
+                    Commands::DonationReceived(donation) => {
+                        info!("Donation received: {:#?}", donation);
+
+                        let moderated_live_channels = self
+                            .channels
+                            .clone()
+                            .get_moderated_live_channels(&self.client.clone(), &token.clone())
+                            .await;
+                        info!("Live channels: {:?}", moderated_live_channels);
+                        let message = format!("!donation_received {}", donation.amount.value);
+
+                        let announcement = format!(
+                            "A donation of ${} has been made by {}!",
+                            donation.amount.value,
+                            donation
+                                .name
+                                .unwrap_or_else(|| "an anonymous user".to_string())
+                        );
+                        let mut channels_sent_messages_to: Vec<Channel> = Vec::new();
+                        for live_channel in &moderated_live_channels {
+                            match Self::send_chat_message(
+                                self.client.clone(),
+                                &token.clone(),
+                                live_channel,
+                                message.as_str(),
+                            )
+                            .await
+                            {
+                                Ok(_) => {
+                                    channels_sent_messages_to.push(live_channel.clone());
+                                    info!("Announcement sent to channel: {}", live_channel.name);
+                                }
+                                Err(e) => {
+                                    error!("Error sending message: {e:?}");
+                                }
+                            };
+                            match Self::send_chat_announcement(
+                                self.client.clone(),
+                                &token.clone(),
+                                live_channel,
+                                announcement.as_str(),
+                            )
+                            .await
+                            {
+                                Ok(_) => {
+                                    channels_sent_messages_to.push(live_channel.clone());
+                                    info!("Message sent to channel: {}", live_channel.name);
+                                }
+                                Err(e) => {
+                                    error!("Error sending message: {e:?}");
+                                }
+                            };
+                        }
+                        info!(
+                            "Donation message sent to {} channels. Channels were: {:?}",
+                            &moderated_live_channels.len(),
+                            &moderated_live_channels
+                        );
+                    }
+                    Commands::RaidInitiated(_) => {}
+                    Commands::StreamStarted(_) => {}
+                    Commands::StreamEnded(_) => {}
+                },
+                Err(e) => match e {
+                    TryRecvError::Closed => {
+                        warn!("Broadcast channel closed");
+                        break;
+                    }
+                    TryRecvError::Lagged(_) => {
+                        warn!("Broadcast channel lagged");
+                        break;
+                    }
+                    TryRecvError::Empty => {
+                        sleep(Duration::from_millis(100)).await;
+                    }
+                },
+            }
+        }
+        info!("broadcast_handler loop ended");
+        Err(Report::msg("broadcast_handler loop ended"))
     }
 
     #[tracing::instrument(skip(client))]

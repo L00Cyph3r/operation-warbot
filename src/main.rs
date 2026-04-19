@@ -6,19 +6,18 @@ use crate::bot::Bot;
 use crate::bot::auth::{Channels, User, UserError};
 use crate::config::Config;
 use crate::routes::tiltify::TiltifyDonation;
-use axum::{
-    Router,
-};
+use axum::Router;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::env;
+use std::env::VarError;
 use std::path::Path;
 use std::sync::Arc;
 use tokio::sync::broadcast::{Receiver, Sender};
 use tokio::sync::{Mutex, broadcast};
-use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
+use tracing::info;
+use tracing_subscriber::{EnvFilter, layer::SubscriberExt, util::SubscriberInitExt};
 use twitch_api::HelixClient;
-use twitch_api::types::UserId;
 
 pub type SharedAppState = Arc<Mutex<AppState>>;
 pub struct AppState {
@@ -32,28 +31,57 @@ async fn main() {
     tracing_subscriber::registry()
         .with(sentry::integrations::tracing::layer())
         .with(
-            tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| {
-                format!(
-                    "debug,{}=trace,hyper_util=debug,axum_serve=debug,tungstenite=debug",
-                    env!("CARGO_CRATE_NAME")
-                )
-                .into()
-            }),
+            EnvFilter::try_from_default_env()
+                .or_else(|_| {
+                    EnvFilter::try_new(env::var("RUST_LOG").unwrap_or_else(|_| "info".to_string()))
+                })
+                .map(|f| {
+                    f.add_directive("hyper=error".parse().expect("could not make directive"))
+                        .add_directive("h2=error".parse().expect("could not make directive"))
+                        .add_directive("rustls=error".parse().expect("could not make directive"))
+                        .add_directive(
+                            "tungstenite=error"
+                                .parse()
+                                .expect("could not make directive"),
+                        )
+                        .add_directive("retainer=info".parse().expect("could not make directive"))
+                        .add_directive("want=info".parse().expect("could not make directive"))
+                        .add_directive("reqwest=info".parse().expect("could not make directive"))
+                        .add_directive("mio=info".parse().expect("could not make directive"))
+                        .add_directive(
+                            format!("{}=trace", env!("CARGO_CRATE_NAME"))
+                                .parse()
+                                .expect("could not make directive"),
+                        )
+                })
+                .expect("Failed to parse filter"),
         )
-        .with(tracing_subscriber::fmt::layer())
+        .with(
+            tracing_subscriber::fmt::layer()
+                .with_line_number(true)
+                .with_file(true),
+        )
         .init();
 
-    let _sentry = sentry::init((
-        "https://bccb4a945782b51898cbf804aba13f19@o4507225498845184.ingest.de.sentry.io/4509317367332944",
-        sentry::ClientOptions {
-            release: sentry::release_name!(),
-            traces_sample_rate: 1.0,
-            // Capture user IPs and potentially sensitive headers when using HTTP server integrations
-            // see https://docs.sentry.io/platforms/rust/data-management/data-collected for more info
-            send_default_pii: true,
-            ..Default::default()
-        },
-    ));
+    let _sentry = match env::var("SENTRY_DSN") {
+        Ok(sentry_dsn) => {
+            info!("Sentry initialized");
+            Some(sentry::init((
+                sentry_dsn.as_str(),
+                sentry::ClientOptions {
+                    release: sentry::release_name!(),
+                    traces_sample_rate: 1.0,
+                    send_default_pii: true,
+                    enable_logs: true,
+                    ..Default::default()
+                },
+            )))
+        }
+        Err(e) => {
+            info!("Sentry not initializing due to missing SENTRY_DSN in environment");
+            None
+        }
+    };
 
     let config = Config::load("config.toml").expect("Failed to load config");
 
@@ -75,13 +103,13 @@ async fn main() {
             let app = Router::new().merge(routes::router()).with_state(app_state);
 
             axum::serve(listener, app)
-                // .with_graceful_shutdown(async move {
-                //     tokio::signal::ctrl_c()
-                //         .await
-                //         .expect("failed to install CTRL+C handler");
-                //     let _ = tx.send(Commands::Shutdown);
-                //     tracing::info!("received CTRL+C, shutting down");
-                // })
+                .with_graceful_shutdown(async move {
+                    tokio::signal::ctrl_c()
+                        .await
+                        .expect("failed to install CTRL+C handler");
+                    let _ = tx.send(Commands::Shutdown);
+                    tracing::info!("received CTRL+C, shutting down");
+                })
                 .await
                 .unwrap();
         }
@@ -127,12 +155,10 @@ async fn main() {
         client: HelixClient::default(),
         token: bot_token.clone(),
         config: config.clone(),
-        broadcaster: UserId::new("Test".to_string()),
         channels: channels.clone(),
         rx,
     };
     let bot_handle = bot.start();
-    
 
     // let mut bot = Bot {
     //     client: HelixClient::default(),
