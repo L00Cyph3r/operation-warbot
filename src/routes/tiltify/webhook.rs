@@ -6,7 +6,6 @@ use axum::extract::State;
 use axum::extract::rejection::JsonRejection;
 use axum::http::{Method, StatusCode};
 use axum::response::{IntoResponse, Response};
-use axum_extra::extract::WithRejection;
 use serde_json::json;
 use thiserror::Error;
 use tracing::info;
@@ -14,22 +13,28 @@ use tracing::info;
 pub async fn handler(
     State(state): State<SharedAppState>,
     method: Method,
-    WithRejection(Json(json), _): WithRejection<Json<TiltifyWebhookRequest>, ApiError>,
+    json: Result<Json<TiltifyWebhookRequest>, JsonRejection>,
 ) -> Result<Json<TiltifyWebhookRequest>, Response> {
     if method != Method::POST {
         return Err(StatusCode::METHOD_NOT_ALLOWED.into_response());
     }
+
+    let json: Json<TiltifyWebhookRequest> = match json {
+        Ok(value) => value,
+        Err(rejection) => return Err(ApiError::from(rejection).into_response()),
+    };
+
     state
         .lock()
         .await
         .tx
         .send(Commands::DonationReceived(TiltifyDonation::from(
-            json.clone(),
+            json.0.clone(),
         )))
         .expect("Failed to send message");
     info!("Tiltify Webhook received",);
 
-    Ok(Json(json))
+    Ok(json)
 }
 
 #[derive(Debug, Error)]
@@ -41,7 +46,7 @@ pub enum ApiError {
 }
 
 impl IntoResponse for ApiError {
-    fn into_response(self) -> axum::response::Response {
+    fn into_response(self) -> Response {
         let payload = json!({
             "message": self.to_string(),
             "origin": "with_rejection"
