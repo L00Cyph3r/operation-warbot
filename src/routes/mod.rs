@@ -5,15 +5,16 @@ use crate::SharedAppState;
 
 pub mod webhook;
 pub mod tiltify;
-pub mod twitch;
+pub mod status;
 
 pub fn router() -> Router<SharedAppState> {
     Router::new()
         .route("/", get(home_handler))
         .route("/webhook", post(tiltify::webhook::handler))
+        .route("/status", get(status::handler))
         .nest("/tiltify", tiltify::router())
 }
 
 pub async fn home_handler() -> impl IntoResponse {
-    "Hello, world!"
+    "I'm innocent!"
 }

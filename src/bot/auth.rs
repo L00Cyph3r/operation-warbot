@@ -22,8 +22,7 @@ use twitch_oauth2::tokens::errors::{RefreshTokenError, RetrieveTokenError, Valid
 pub struct Channels(pub Vec<Channel>);
 
 impl Channels {
-    #[tracing::instrument(skip(path))]
-
+    #[tracing::instrument(skip(self, path))]
     pub fn save(&self, path: impl AsRef<Path>) -> Result<(), Report> {
         let mut file = std::fs::File::create(path)?;
         let contents = serde_json::to_string(&self)?;
@@ -47,9 +46,11 @@ impl Channels {
         &self,
         client: &HelixClient<'_, reqwest::Client>,
         token: &UserToken,
+        channels: &Vec<Channel>,
     ) -> Vec<Channel> {
-        let all: Vec<UserId> = self.0.iter().map(|c| c.user_id.clone()).collect();
-        let req = twitch_api::helix::streams::get_streams::GetStreamsRequest::user_ids(all);
+        let req = twitch_api::helix::streams::get_streams::GetStreamsRequest::user_ids(
+            channels.iter().map(|c| c.user_id.clone()).collect::<Vec<UserId>>(),
+        );
         match client.req_get(req, token).in_current_span().await {
             Ok(res) => res
                 .data
@@ -95,10 +96,9 @@ impl Channels {
         client: &HelixClient<'_, reqwest::Client>,
         token: &UserToken,
     ) -> Vec<Channel> {
-        let (live, moderated) = tokio::join!(self.get_live_channels(client, token), self.get_moderated_channels(client, token));
+        let moderated = self.get_moderated_channels(client, token).await;
+        let live = self.get_live_channels(client, token, &moderated).await;
         info!("Found {} live and {} moderated channels", live.len(), moderated.len());
-        info!("Live: {}", live.iter().map(|c| c.name.clone().to_string()).collect::<Vec<String>>().join(" "));
-        info!("Moderated: {}", moderated.iter().map(|c| c.name.clone().to_string()).collect::<Vec<String>>().join(" "));
         let mut channels: Vec<Channel> = Vec::new();
         for channel in moderated {
             if live.iter().any(|live| live.user_id == channel.user_id) {
@@ -130,9 +130,6 @@ impl Into<UserId> for Channel {
         self.user_id
     }
 }
-
-#[derive(Serialize, Deserialize, Debug, Clone, Default)]
-pub struct Streamers(pub Vec<User>);
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct User {

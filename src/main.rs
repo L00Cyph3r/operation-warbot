@@ -2,27 +2,47 @@ mod bot;
 mod config;
 mod routes;
 
-use crate::bot::Bot;
-use crate::bot::auth::{Channels, User, UserError};
-use crate::config::Config;
-use crate::routes::tiltify::TiltifyDonation;
+use crate::{
+    bot::Bot,
+    bot::auth::{Channel, Channels, User, UserError},
+    config::Config,
+    routes::tiltify::TiltifyDonation,
+};
 use axum::Router;
+use chrono::DateTime;
 use serde::{Deserialize, Serialize};
-use std::collections::HashSet;
-use std::env;
-use std::env::VarError;
-use std::path::Path;
-use std::sync::Arc;
-use tokio::sync::broadcast::{Receiver, Sender};
-use tokio::sync::{Mutex, broadcast};
+use std::{env, path::Path, sync::Arc};
+use tokio::{
+    sync::broadcast::{Receiver, Sender},
+    sync::{Mutex, broadcast},
+};
 use tracing::info;
-use tracing_subscriber::{EnvFilter, layer::SubscriberExt, util::SubscriberInitExt};
+use tracing_subscriber::{
+    EnvFilter, fmt::format::FmtSpan, layer::SubscriberExt, util::SubscriberInitExt,
+};
 use twitch_api::HelixClient;
 
 pub type SharedAppState = Arc<Mutex<AppState>>;
 pub struct AppState {
-    received_donations: HashSet<TiltifyDonation>,
     tx: Sender<Commands>,
+    pub channels: ChannelsState,
+}
+#[derive(Default, Debug, Clone, Serialize, Deserialize)]
+pub struct ChannelsState {
+    pub last_update: DateTime<chrono::Utc>,
+    pub channels_live: Vec<Channel>,
+    pub channels_moderated: Vec<Channel>,
+}
+
+impl ChannelsState {
+    pub fn set_channels_live(&mut self, channels: Vec<Channel>) {
+        self.channels_live = channels;
+        self.last_update = chrono::Utc::now();
+    }
+    pub fn set_channels_moderated(&mut self, channels: Vec<Channel>) {
+        self.channels_moderated = channels;
+        self.last_update = chrono::Utc::now();
+    }
 }
 
 #[tokio::main]
@@ -59,7 +79,8 @@ async fn main() {
         .with(
             tracing_subscriber::fmt::layer()
                 .with_line_number(true)
-                .with_file(true),
+                .with_file(true)
+                .with_span_events(FmtSpan::CLOSE),
         )
         .init();
 
@@ -77,7 +98,7 @@ async fn main() {
                 },
             )))
         }
-        Err(e) => {
+        Err(_) => {
             info!("Sentry not initializing due to missing SENTRY_DSN in environment");
             None
         }
@@ -87,8 +108,8 @@ async fn main() {
 
     let (tx, rx): (Sender<Commands>, Receiver<Commands>) = broadcast::channel(100);
     let app_state: SharedAppState = Arc::new(Mutex::new(AppState {
-        received_donations: HashSet::new(),
         tx: tx.clone(),
+        channels: ChannelsState::default(),
     }));
 
     let http_server = {
@@ -108,7 +129,7 @@ async fn main() {
                         .await
                         .expect("failed to install CTRL+C handler");
                     let _ = tx.send(Commands::Shutdown);
-                    tracing::info!("received CTRL+C, shutting down");
+                    info!("received CTRL+C, shutting down");
                 })
                 .await
                 .unwrap();
@@ -157,6 +178,7 @@ async fn main() {
         config: config.clone(),
         channels: channels.clone(),
         rx,
+        state: app_state.clone(),
     };
     let bot_handle = bot.start();
 
@@ -182,4 +204,5 @@ enum Commands {
     RaidInitiated(String),
     StreamStarted(String),
     StreamEnded(String),
+    UpdateChannels,
 }

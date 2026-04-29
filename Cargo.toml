@@ -5,22 +5,21 @@ edition = "2024"
 
 [dependencies]
 thiserror = { version = "2.0.12", features = [] }
-axum = { version = "0.8.4", features = ["http2", "json", "tracing", "tokio", "matched-path", "default"] }
-axum-extra = { version = "0.12.6", features = ["json-deserializer", "json-lines"] }
+axum = { version = "0.8.4", features = ["http2", "json", "tracing", "tokio", "matched-path", "default", "macros"] }
 eyre = "0.6.12"
 dotenvy = { version = "0.15.7", features = ["clap"] }
 serde = { version = "1.0.219", features = ["derive", "alloc"] }
 serde_json = { version = "1.0.140", features = [] }
-tungstenite = "0.29.0"
 tokio = { version = "1.44.2", default-features = false, features = ["rt", "rt-multi-thread", "macros", "signal"] }
-tokio-tungstenite = { version = "0.29.0", features = ["native-tls", "url"] }
 twitch_api = { version = "0.7.2", features = ["eventsub", "helix", "reqwest", "twitch_oauth2", "serde_json", "trace_unknown_fields", "tracing", ] }
 twitch_oauth2 = { version = "0.15.2", features = ["client"] }
 toml = "1.1.2+spec-1.1.0"
 serde_derive = "1.0.219"
-futures = "0.3.31"
 tracing = "0.1.41"
 tracing-subscriber = { version = "0.3.19", features = ["env-filter", "serde"] }
-url = "2.5.4"
 reqwest = "0.12.15"
-sentry = { version = "0.47.0", features = ["tracing", "logs", "opentelemetry"] }
+sentry = { version = "0.48.0", features = ["tracing", "logs", "opentelemetry"] }
+chrono = { version = "0.4.44", features = ["serde"] }
+
+[profile.release]
+opt-level = 3
