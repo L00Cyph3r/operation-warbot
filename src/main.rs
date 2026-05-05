@@ -2,6 +2,7 @@ mod bot;
 mod config;
 mod routes;
 
+use crate::bot::tiltify::{TiltifyTeamResponse, TiltifyUser};
 use crate::{
     bot::Bot,
     bot::auth::{Channel, Channels, User, UserError},
@@ -10,13 +11,15 @@ use crate::{
 };
 use axum::Router;
 use chrono::DateTime;
+use oauth2::basic::BasicTokenType;
 use serde::{Deserialize, Serialize};
+use std::time::Duration;
 use std::{env, path::Path, sync::Arc};
 use tokio::{
     sync::broadcast::{Receiver, Sender},
     sync::{Mutex, broadcast},
 };
-use tracing::info;
+use tracing::{debug, info};
 use tracing_subscriber::{
     EnvFilter, fmt::format::FmtSpan, layer::SubscriberExt, util::SubscriberInitExt,
 };
@@ -27,6 +30,7 @@ pub struct AppState {
     tx: Sender<Commands>,
     pub channels: ChannelsState,
 }
+
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
 pub struct ChannelsState {
     pub last_update: DateTime<chrono::Utc>,
@@ -107,6 +111,26 @@ async fn main() {
     let config = Config::load("config.toml").expect("Failed to load config");
 
     let (tx, rx): (Sender<Commands>, Receiver<Commands>) = broadcast::channel(100);
+
+    let mut tiltify_user = TiltifyUser::load("./tiltify.json").unwrap_or_else(|_| {
+        let auth_url = crate::bot::tiltify::authorize_url();
+        info!("Please authenticate Tiltify using this URL: {}", auth_url.0);
+
+        TiltifyUser {
+            access_token: None,
+            refresh_token: None,
+            expires_in: Duration::default(),
+            token_type: BasicTokenType::Bearer,
+        }
+    });
+
+    let mut tiltify_client = bot::tiltify::TiltifyClient {
+        user: tiltify_user,
+        tx: tx.clone(),
+    };
+
+    let tiltify_client_handle = tiltify_client.start(tx.clone());
+
     let app_state: SharedAppState = Arc::new(Mutex::new(AppState {
         tx: tx.clone(),
         channels: ChannelsState::default(),
@@ -115,6 +139,7 @@ async fn main() {
     let http_server = {
         let config = config.clone();
         let app_state = app_state.clone();
+        let tx = tx.clone();
         async move {
             let listener = tokio::net::TcpListener::bind(&config.server.to_socket_addrs())
                 .await
@@ -177,7 +202,7 @@ async fn main() {
         token: bot_token.clone(),
         config: config.clone(),
         channels: channels.clone(),
-        rx,
+        tx: tx.clone(),
         state: app_state.clone(),
     };
     let bot_handle = bot.start();
@@ -194,15 +219,30 @@ async fn main() {
     //     bot.listen().await
     // });
 
-    let _ = tokio::join!(http_handle, bot_handle);
+    let refresher = async {
+        debug!("Refresher started");
+        let tx = tx.clone();
+        loop {
+            debug!("Refresher loop start");
+            tokio::time::sleep(Duration::from_secs(30)).await;
+            tx.send(Commands::TiltifyAuthRefresh).unwrap();
+            debug!("Refresher loop end");
+        }
+    };
+    let _ = tokio::join!(http_handle, bot_handle, tiltify_client_handle, refresher);
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-enum Commands {
+pub enum Commands {
     Shutdown,
     DonationReceived(TiltifyDonation),
     RaidInitiated(String),
     StreamStarted(String),
     StreamEnded(String),
     UpdateChannels,
+    OAuthResponse(String),
+    TiltifyAuthRefresh,
+    TiltifyTeamCampaignsRequest,
+    TiltifyTeamStatsRequest,
+    TiltifyTeamStatsResponse(TiltifyTeamResponse),
 }

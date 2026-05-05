@@ -18,6 +18,7 @@ use twitch_api::helix::chat::{
 use twitch_oauth2::{TwitchToken, UserToken};
 
 pub mod auth;
+pub mod tiltify;
 
 // pub twitch_id: String,
 // pub twitch_name: String,
@@ -30,7 +31,7 @@ pub struct Bot {
     pub token: Arc<Mutex<UserToken>>,
     pub config: Config,
     pub channels: Channels,
-    pub rx: tokio::sync::broadcast::Receiver<Commands>,
+    pub tx: tokio::sync::broadcast::Sender<Commands>,
     pub state: SharedAppState,
 }
 
@@ -130,7 +131,7 @@ impl Bot {
     }
 
     async fn broadcast_handler(&self) -> Result<(), Report> {
-        let mut rx = self.rx.resubscribe();
+        let mut rx = self.tx.subscribe();
         // We check constantly if the token is valid.
         // We also need to refresh the token if it's about to be expired.
         let span = span!(tracing::Level::INFO, "broadcast_handler");
@@ -212,9 +213,9 @@ impl Bot {
                             &moderated_live_channels
                         );
                     }
-                    Commands::RaidInitiated(_) => {}
-                    Commands::StreamStarted(_) => {}
-                    Commands::StreamEnded(_) => {}
+                    _ => {
+                        // info!("Received unknown command: {:?}", cmd);
+                    }
                 },
                 Err(e) => match e {
                     TryRecvError::Closed => {

@@ -55,7 +55,7 @@ impl Channels {
             Ok(res) => res
                 .data
                 .iter()
-                .filter(|s| s.type_ == StreamType::Live)
+                .filter(|s| s.type_ == StreamType::Live && s.game_id.as_str() == "2955")
                 .map(|s| Channel {
                     name: s.user_login.clone(),
                     user_id: s.user_id.clone(),

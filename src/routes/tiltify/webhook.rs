@@ -32,6 +32,12 @@ pub async fn handler(
             json.0.clone(),
         )))
         .expect("Failed to send message");
+    state
+        .lock()
+        .await
+        .tx
+        .send(Commands::TiltifyTeamStatsRequest)
+        .expect("Failed to send message");
     info!("Tiltify Webhook received",);
 
     Ok(json)
