@@ -88,6 +88,13 @@ async fn main() {
         )
         .init();
 
+    // Set a panic hook that will exit the process on when any thread panics
+    let default_panic = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |info| {
+        default_panic(info);
+        std::process::exit(1);
+    }));
+
     let _sentry = match env::var("SENTRY_DSN") {
         Ok(sentry_dsn) => {
             info!("Sentry initialized");
