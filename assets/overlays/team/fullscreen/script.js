@@ -62,24 +62,38 @@ let milestones = [
     18500,
     19000,
     19500,
+    20000,
 ];
 
 function setDonatedAmount(amount, skip_milestones = false) {
+    let oldAmount = Number.parseFloat(document.getElementById('total').innerText.replaceAll(/[$,]/g, ''));
     document.getElementById('total').innerText = Intl.NumberFormat('en-US', {
         style: 'currency',
         currency: 'USD',
     }).format(amount);
 
-    document.getElementById('total').classList.add('grow');
-    setTimeout(() => {
-        document.getElementById('total').classList.remove('grow');
-    }, 2500);
-
     if (skip_milestones) {
         return;
     }
-    (new Audio('/alerts/wb_wow_another_donation.mp3')).play().then();
 
+    // Check if any milestone has been crossed
+    for (let milestone of milestones) {
+        if (oldAmount < milestone && amount >= milestone) {
+            console.log('Milestone reached:', milestone);
+            setTimeout(() => {
+                document.getElementById('warbucks').classList.add('shake');
+                document.getElementById('warbucks').classList.add('visible');
+                (new Audio('/alerts/wb_wow_another_donation.mp3')).play().then();
+
+                setTimeout(() => {
+                    document.getElementById('warbucks').classList.remove('shake');
+                    document.getElementById('warbucks').classList.remove('visible');
+                }, 5000);
+
+            }, 5000);
+            break;
+        }
+    }
 }
 
 fetch('/tiltify_team_stats.json').then((res) => {

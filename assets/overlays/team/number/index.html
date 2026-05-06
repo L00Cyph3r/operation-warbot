@@ -41,13 +41,29 @@
         font-size: 14vw;
         text-align: center;
         color: mediumblue;
-        -webkit-text-stroke: 7px darkorange;
+        -webkit-text-stroke: .05em darkorange;
+    }
+
+    #total.grow {
+        animation: grow 2s ease-in-out;
+    }
+
+    @keyframes grow {
+        0% {
+            transform: scale(1);
+        }
+        50% {
+            transform: scale(1.20);
+        }
+        100% {
+            transform: scale(1);
+        }
     }
 </style>
 
 <div class="flex-container">
     <div class="row">
-        <div id="total">$28,368.69</div>
+        <div id="total"></div>
     </div>
 </div>
 </body>

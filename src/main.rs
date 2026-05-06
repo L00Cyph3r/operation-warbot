@@ -230,10 +230,8 @@ async fn main() {
         debug!("Refresher started");
         let tx = tx.clone();
         loop {
-            debug!("Refresher loop start");
-            tokio::time::sleep(Duration::from_secs(30)).await;
+            tokio::time::sleep(Duration::from_secs(300)).await;
             tx.send(Commands::TiltifyAuthRefresh).unwrap();
-            debug!("Refresher loop end");
         }
     };
     let _ = tokio::join!(http_handle, bot_handle, tiltify_client_handle, refresher);
