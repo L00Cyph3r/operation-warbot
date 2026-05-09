@@ -4,12 +4,11 @@ use std::env;
 use std::fmt::Debug;
 use std::io::{Read, Write};
 use std::path::Path;
-use tracing::{error, info, Instrument};
+use tracing::{Instrument, error, info};
 use twitch_api::client::CompatError;
 use twitch_api::helix::streams::StreamType;
 use twitch_api::types::{UserId, UserName};
 use twitch_api::{HelixClient, TwitchClient};
-use twitch_oauth2::{AccessToken, TwitchToken};
 use twitch_oauth2::AppAccessToken;
 use twitch_oauth2::ClientId;
 use twitch_oauth2::ClientSecret;
@@ -17,6 +16,7 @@ use twitch_oauth2::RefreshToken;
 use twitch_oauth2::Scope;
 use twitch_oauth2::UserToken;
 use twitch_oauth2::tokens::errors::{RefreshTokenError, RetrieveTokenError, ValidationError};
+use twitch_oauth2::{AccessToken, TwitchToken};
 
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
 pub struct Channels(pub Vec<Channel>);
@@ -49,13 +49,16 @@ impl Channels {
         channels: &Vec<Channel>,
     ) -> Vec<Channel> {
         let req = twitch_api::helix::streams::get_streams::GetStreamsRequest::user_ids(
-            channels.iter().map(|c| c.user_id.clone()).collect::<Vec<UserId>>(),
+            channels
+                .iter()
+                .map(|c| c.user_id.clone())
+                .collect::<Vec<UserId>>(),
         );
         match client.req_get(req, token).in_current_span().await {
             Ok(res) => res
                 .data
                 .iter()
-                .filter(|s| s.type_ == StreamType::Live && s.game_id.as_str() == "2955")
+                .filter(|s| s.type_ == StreamType::Live && s.game_id.as_str() == "80607")
                 .map(|s| Channel {
                     name: s.user_login.clone(),
                     user_id: s.user_id.clone(),
@@ -90,7 +93,7 @@ impl Channels {
             }
         }
     }
-    
+
     pub async fn get_moderated_live_channels(
         &self,
         client: &HelixClient<'_, reqwest::Client>,
@@ -98,7 +101,11 @@ impl Channels {
     ) -> Vec<Channel> {
         let moderated = self.get_moderated_channels(client, token).await;
         let live = self.get_live_channels(client, token, &moderated).await;
-        info!("Found {} live and {} moderated channels", live.len(), moderated.len());
+        info!(
+            "Found {} live and {} moderated channels",
+            live.len(),
+            moderated.len()
+        );
         let mut channels: Vec<Channel> = Vec::new();
         for channel in moderated {
             if live.iter().any(|live| live.user_id == channel.user_id) {
