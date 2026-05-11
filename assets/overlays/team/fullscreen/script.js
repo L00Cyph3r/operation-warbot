@@ -80,20 +80,24 @@ function setDonatedAmount(amount, skip_milestones = false) {
     for (let milestone of milestones) {
         if (oldAmount < milestone && amount >= milestone) {
             console.log('Milestone reached:', milestone);
-            setTimeout(() => {
-                document.getElementById('warbucks').classList.add('shake');
-                document.getElementById('warbucks').classList.add('visible');
-                (new Audio('/alerts/wb_wow_another_donation.mp3')).play().then();
-
-                setTimeout(() => {
-                    document.getElementById('warbucks').classList.remove('shake');
-                    document.getElementById('warbucks').classList.remove('visible');
-                }, 5000);
-
-            }, 5000);
+            playMilestone();
             break;
         }
     }
+}
+
+function playMilestone() {
+    setTimeout(() => {
+        document.getElementById('warbucks').classList.add('shake');
+        document.getElementById('warbucks').classList.add('visible');
+        (new Audio('/alerts/annie_milestone.mp3')).play().then();
+
+        setTimeout(() => {
+            document.getElementById('warbucks').classList.remove('shake');
+            document.getElementById('warbucks').classList.remove('visible');
+        }, 7500);
+
+    }, 5000);
 }
 
 fetch('/tiltify_team_stats.json').then((res) => {
@@ -103,3 +107,7 @@ fetch('/tiltify_team_stats.json').then((res) => {
         setDonatedAmount(total_amount_raised, true);
     })
 });
+
+if (window.location.search.includes('test')) {
+    playMilestone();
+}
