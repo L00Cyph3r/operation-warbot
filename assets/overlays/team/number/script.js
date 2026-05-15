@@ -78,7 +78,7 @@ function setDonatedAmount(amount, skip_milestones = false) {
     if (skip_milestones) {
         return;
     }
-    (new Audio('/alerts/wb_wow_another_donation.mp3')).play().then();
+    // (new Audio('/alerts/wb_wow_another_donation.mp3')).play().then();
 
 }
 
