@@ -5,7 +5,9 @@
     <title>Operations Warbucks Streaming Schedule</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Open+Sans:ital,wght@0,300..800;1,300..800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Open+Sans:ital,wght@0,300..800;1,300..800&display=swap"
+          rel="stylesheet">
+    <meta name="refresh" content="60"/>
 </head>
 <body>
 <style>
@@ -14,9 +16,9 @@
         font-optical-sizing: auto;
         font-weight: 400;
         font-style: normal;
-        font-variation-settings:
-                "wdth" 100;
+        font-variation-settings: "wdth" 100;
     }
+
     .wrapper {
         width: 100%;
         height: 100%;
@@ -25,11 +27,13 @@
         justify-content: center;
         align-items: center;
     }
+
     #schedule {
         display: flex;
         flex-direction: column;
         gap: 1rem;
     }
+
     .item {
         display: flex;
         justify-content: space-between;
@@ -41,11 +45,23 @@
         color: #fff;
         width: 100%;
     }
+
     .time {
         display: inline-block;
     }
+
+    .item.live {
+        -webkit-box-shadow: 0px 0px 10px 10px rgba(255, 46, 46, 1);
+        -moz-box-shadow: 0px 0px 10px 10px rgba(255, 46, 46, 1);
+        box-shadow: 0 0px 10px 10px rgba(255, 46, 46, 1);
+    }
+
     .streamer {
         text-align: left;
+    }
+
+    a, a:visited {
+        color: #fff;
     }
 </style>
 
@@ -58,37 +74,69 @@
 
 <script>
     let schedule = [
-        { "start": 1778835600, "end": 1778842800, "streamer": "OrangePheonix" },
-        { "start": 1778842800, "end": 1778857200, "streamer": "TheOlderGamer and FireyToad" },
-        { "start": 1778853600, "end": 1778868000, "streamer": "Eralm_237" },
-        { "start": 1778868000, "end": 1778878800, "streamer": "BrotherSabathius" },
-        { "start": 1778875200, "end": 1778886000, "streamer": "ShadeWave01" },
-        { "start": 1778882400, "end": 1778896800, "streamer": "BleedingRoseEmpire and Illistyn" },
-        { "start": 1778896800, "end": 1778911200, "streamer": "TNAD and Geno Garon" },
-        { "start": 1778911200, "end": 1778922000, "streamer": "CMDRSpaceRooster and OzHalleron" },
-        { "start": 1778922000, "end": 1776344400, "streamer": "SuperChicken" },
-        { "start": 1778932800, "end": 1778947200, "streamer": "Ashtro_train" },
-        { "start": 1778947200, "end": 1778958000, "streamer": "RexaSavage" },
-        { "start": 1778954400, "end": 1778965200, "streamer": "The Naked Raider and Esdeeon" },
-        { "start": 1778965200, "end": 1778976000, "streamer": "Peace and Love Jodi and PhotoStyle" },
-        { "start": 1778976000, "end": 1778986800, "streamer": "gkar_falcon" },
-        { "start": 1778986800, "end": 1779001200, "streamer": "RainmanGames" },
-        { "start": 1779001200, "end": 1779015600, "streamer": "Nikki Dangerous" },
-        { "start": 1779012000, "end": 1779026400, "streamer": "TheOldManThatGames" },
-        { "start": 1779022800, "end": 1779033600, "streamer": "Moerdyr" },
-        { "start": 1779030000, "end": 1779040800, "streamer": "Captain Metcy" },
-        { "start": 1779037200, "end": 1779048000, "streamer": "NanyaBizNiz" },
-        { "start": 1779048000, "end": 1779062400, "streamer": "Ascorbius and Turjanna" },
-        { "start": 1779058800, "end": 1779069600, "streamer": "Spatula" },
-        { "start": 1779066000, "end": 1779080400, "streamer": "Slamscape" },
-        { "start": 1779080400, "end": 1779094800, "streamer": "KreeKree" },
-        { "start": 1779094800, "end": 1779109200, "streamer": "Hatch" },
-        { "start": 1779105600, "end": 1779116400, "streamer": "Epaphus" },
-        { "start": 1779116400, "end": 1779127200, "streamer": "Father Bill" },
-        { "start": 1779123600, "end": 1779134400, "streamer": "The Singing Sailo" },
-        { "start": 1779130800, "end": 1779141600, "streamer": "ApolloTheWhite" },
-        { "start": 1779138000, "end": 1779148800, "streamer": "AJ" },
-        { "start": 1779148800, "end": 1779148800, "streamer": "OrangePheonix AFTERPARTY!" },
+        {"start": 1778835600, "end": 1778842800, "streamers": [{"OrangePheonix": "OrangePheonix"}]},
+        {
+            "start": 1778842800,
+            "end": 1778857200,
+            "streamers": [{"TheOlderGamerAU": "TheOlderGamerAU"}, {"FireyToad": "FireyToad"}]
+        },
+        {"start": 1778853600, "end": 1778868000, "streamers": [{"Eralm_237": "Eralm_237"}]},
+        {"start": 1778868000, "end": 1778878800, "streamers": [{"Brother_Sabathius": "Brother_Sabathius"}]},
+        {"start": 1778875200, "end": 1778886000, "streamers": [{"ShadeWave01": "ShadeWave01"}]},
+        {
+            "start": 1778882400,
+            "end": 1778896800,
+            "streamers": [{"BleedingRoseEmpire": "BleedingRoseEmpire"}, {"Illistyn": "Illistyn"}]
+        },
+        {
+            "start": 1778896800,
+            "end": 1778911200,
+            "streamers": [{"CMDR_TotallyNotADemon": "TotallyNotADemon"}, {"GenoGaron": "GenoGaron"}]
+        },
+        {
+            "start": 1778911200,
+            "end": 1778922000,
+            "streamers": [{"CMDRSpaceRooster": "SpaceRooster"}, {"OzHalleron": "OzHalleron"}]
+        },
+        {"start": 1778922000, "end": 1776344400, "streamers": [{"Super_Chicken": "SuperChicken"}]},
+        {"start": 1778932800, "end": 1778947200, "streamers": [{"Ashtro_train": "Ashtro_train"}]},
+        {"start": 1778947200, "end": 1778958000, "streamers": [{"RexaSavage": "RexaSavage"}]},
+        {
+            "start": 1778954400,
+            "end": 1778965200,
+            "streamers": [{"TheNakedRaider": "TheNakedRaider"}, {"Esdeeon": "Esdeeon"}]
+        },
+        {
+            "start": 1778965200,
+            "end": 1778976000,
+            "streamers": [{"PeaceAndLoveJodi": "PeaceAndLoveJodi"}, {"Photostyle": "Photostyle"}]
+        },
+        {"start": 1778976000, "end": 1778986800, "streamers": [{"Gkar_Falcon": "Gkar_Falcon"}]},
+        {"start": 1778986800, "end": 1779001200, "streamers": [{"RainmanGames": "RainmanGames"}]},
+        {"start": 1779001200, "end": 1779015600, "streamers": [{"Nikki_Dangerous": "Nikki_Dangerous"}]},
+        {"start": 1779012000, "end": 1779026400, "streamers": [{"TheOldManThatGames": "TheOldManThatGames"}]},
+        {
+            "start": 1779022800,
+            "end": 1779033600,
+            "streamers": [{"Moerdyr": "Moerdyr"}, {"OrangePheonix": "OrangePheonix"}]
+        },
+        {"start": 1779030000, "end": 1779040800, "streamers": [{"Captain_Metcy": "Captain_Metcy"}]},
+        {"start": 1779037200, "end": 1779048000, "streamers": [{"NanyaBizNiz": "NanyaBizNiz"}]},
+        {
+            "start": 1779048000,
+            "end": 1779062400,
+            "streamers": [{"CMDRAscorbius": "Ascorbius"}, {"Turjanna": "Turjanna"}]
+        },
+        {"start": 1779058800, "end": 1779069600, "streamers": [{"SpatulaDangus": "SpatulaDangus"}]},
+        {"start": 1779066000, "end": 1779080400, "streamers": [{"Slamscape": "Slamscape"}]},
+        {"start": 1779080400, "end": 1779094800, "streamers": [{"KreeKree": "KreeKree"}]},
+        {"start": 1779094800, "end": 1779109200, "streamers": [{"CMDRHatch": "Hatch"}]},
+        {"start": 1779105600, "end": 1779116400, "streamers": [{"EpaphusUK": "Epaphus"}]},
+        {"start": 1779116400, "end": 1779127200, "streamers": [{"Father_Bill": "Father_Bill"}]},
+        {"start": 1779123600, "end": 1779134400, "streamers": [{"TheSingingSailo": "The Singing Sailo"}]},
+        {"start": 1779130800, "end": 1779141600, "streamers": [{"ApolloTheWhite": "ApolloTheWhite"}]},
+        {"start": 1779138000, "end": 1779148800, "streamers": [{"CmdrAndrewJohnson": "CmdrAndrewJohnson"}]},
+        {"start": 1779148800, "end": 1779148800, "streamers": [{"OrangePheonix": "OrangePheonix AFTERPARTY!"}]},
     ];
     schedule.sort((a, b) => a.start - b.start);
     schedule.forEach((item) => {
@@ -105,13 +153,28 @@
         });
         let itemElement = document.createElement('div');
         itemElement.classList.add('item');
+        let unix_now = Math.floor(Date.now() / 1000);
+
+        let active = false;
+        let streamers = item.streamers.map(streamer => {
+            if (item.start <= unix_now && item.end >= unix_now) {
+                active = true;
+            }
+            // console.log(Object.keys(streamer)[0]);
+            // console.log(Object.values(streamer)[0]);
+            return `<a href="https://twitch.tv/${Object.keys(streamer)[0]}" class="streamer">${Object.values(streamer)[0]}</a>`;
+        }).join(' & ');
+        console.log(streamers);
         itemElement.innerHTML = `
             <div class="time">
                 <span class="date">${dateString}</span>
                 <span class="time">${timeString}</span>
             </div>
-            <span class="streamer">${item.streamer}</span>
+            <span class="streamer">${streamers}</span>
         `;
+        if (active) {
+            itemElement.classList.add('live');
+        }
         document.getElementById('schedule').appendChild(itemElement);
     })
 </script>
